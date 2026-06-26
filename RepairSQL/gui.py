@@ -165,7 +165,52 @@ class RepairGUI(QMainWindow):
         except Exception as e:
             self.log_ui(f"Diagnostics error: {e}", "error")
 
-    def smart_repair(self):
+  def smart_repair(self):
+    if not self.detector.xampp_path:
+        self.log_ui("Please detect XAMPP first.", "error")
+        return
+
+    reply = QMessageBox.question(self, "Confirm Repair",
+                                 "Smart Repair will replace the system database (mysql) with the backup version.\n"
+                                 "A full backup of your data folder will be created.\n\n"
+                                 "Proceed?",
+                                 QMessageBox.Yes | QMessageBox.No)
+    if reply != QMessageBox.Yes:
+        return
+
+    self.progress.setValue(0)
+    self.log_ui("Starting Smart Repair...")
+    self.statusBar().showMessage("Repair in progress...")
+
+    def thread_func():
+        try:
+            self.repair_engine = RepairEngine(self.detector, self.backup)
+            backup_dir = self.repair_engine.smart_repair()
+            self.log_ui(f"Repair completed. Backup saved to: {backup_dir}")
+            self.progress.setValue(100)
+            self.statusBar().showMessage("Repair successful")
+            QMessageBox.information(self, "Repair", f"Repair completed successfully.\nBackup: {backup_dir}")
+        except Exception as e:
+            # Capture the error and show it in GUI
+            error_msg = str(e)
+            self.log_ui(f"Repair failed: {error_msg}", "error")
+            self.progress.setValue(0)
+            self.statusBar().showMessage("Repair failed")
+            # Show a detailed error box
+            QMessageBox.critical(self, "Repair Failed", 
+                                 f"An error occurred during repair:\n\n{error_msg}\n\n"
+                                 "Check the console log for more details.")
+            # Also log the full traceback to the log file
+            import traceback
+            tb = traceback.format_exc()
+            self.logger.error(tb)
+            # Optionally write to a crash log
+            with open("crash.log", "w") as f:
+                f.write(tb)
+
+    thread = threading.Thread(target=thread_func)
+    thread.daemon = True
+    thread.start()
         if not self.detector.xampp_path:
             self.log_ui("Please detect XAMPP first.", "error")
             return
