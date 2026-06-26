@@ -1,0 +1,71 @@
+# Fix: MariaDB "Incorrect file format 'db'" (XAMPP)
+
+## Symptoms
+
+* `phpMyAdmin` loads forever.
+* PHP pages using MySQL (`mysqli_connect()`) hang indefinitely.
+* `mysql.exe -u root` does not respond.
+* MySQL starts, but connections never complete.
+
+## Cause
+
+The **`mysql` system database** became corrupted, specifically the privilege table:
+
+```text
+C:\xampp\mysql\data\mysql\db
+```
+
+MariaDB reports:
+
+```text
+Fatal error: Can't open and lock privilege tables:
+Incorrect file format 'db'
+```
+
+User databases (e.g., `sps`, `portfolio_db`, etc.) are usually **not affected**.
+
+---
+
+## Solution
+
+1. Stop MySQL.
+2. Backup `C:\xampp\mysql\data`.
+3. Rename:
+
+```text
+C:\xampp\mysql\data\mysql
+→
+C:\xampp\mysql\data\mysql_old
+```
+
+4. Copy the clean system database:
+
+```text
+From:
+C:\xampp\mysql\backup\mysql
+
+To:
+C:\xampp\mysql\data\mysql
+```
+
+> **Copy only the `mysql` folder.**
+
+Do **not** replace:
+
+* `ibdata1`
+* `ib_logfile0`
+* `ib_logfile1`
+* `aria_log*`
+* User database folders
+
+5. Start MySQL and verify:
+
+   * `http://localhost/phpmyadmin`
+   * Database connections (`mysqli`)
+   * Existing databases are accessible.
+
+---
+
+## Root Cause
+
+Only the **system privilege tables** inside the `mysql` database were corrupted. Restoring the clean `mysql` folder from XAMPP's `backup` directory repaired the authentication system without affecting existing user databases.
