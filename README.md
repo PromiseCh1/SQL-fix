@@ -6,6 +6,46 @@ Created by **Promise**.
 
 ---
 
+## Quick Start
+
+### Option 1: Download and Run (.exe)
+
+1. Go to the **dist** folder in this repository.
+2. Download `RepairSQL.exe`.
+3. Right-click `RepairSQL.exe` → **Run as administrator**.
+4. Click **Auto Detect** or browse to your XAMPP folder.
+5. Click **Smart Repair** – done.
+
+No Python installation required.
+
+---
+
+### Option 2: Run from Source (for Developers)
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/yourusername/RepairSQL.git
+   cd RepairSQL
+   ```
+
+2. Create a virtual environment (optional):
+   ```bash
+   python -m venv venv
+   .\venv\Scripts\activate   # on Windows
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the application:
+   ```bash
+   python src/main.py
+   ```
+
+---
+
 ## What it does
 
 - Detects your XAMPP installation automatically.
@@ -17,27 +57,25 @@ Created by **Promise**.
 
 ---
 
-## How to use
-
-1. Download `RepairSQL.exe` (standalone – no Python required).
-2. Run it as Administrator.
-3. Click **Auto Detect** or browse to your XAMPP folder.
-4. Click **Smart Repair**.
-5. Start MariaDB from XAMPP – it should now work.
-
----
-
 ## Requirements
 
+### For the .exe
 - Windows 7 or later.
-- No additional software – the `.exe` is self-contained.
+- No additional software.
+
+### For running from source
+- Python 3.12+ with PySide6 and psutil.
 
 ---
 
-## For developers
+## Building the .exe yourself
 
-- Python 3.12+ with PySide6 and psutil.
-- Clone the repo and run `pip install -r requirements.txt`, then `python main.py`.
+```bash
+pip install pyinstaller
+python -m PyInstaller --onefile --windowed --name "RepairSQL" src/main.py
+```
+
+The .exe will be in the `dist` folder.
 
 ---
 
@@ -50,4 +88,4 @@ MIT – free to use and modify.
 ## Credits
 
 **Author**: Promise  
-**GitHub**: [promisech1](https://github.com/promisech1)
+**GitHub**: [PromiseCH1](https://github.com/PromiseCH1)
