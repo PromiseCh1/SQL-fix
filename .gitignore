@@ -1,19 +1,22 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.so
-*.dylib
-*.dll
-*.exe
-*.log
-*.zip
-.DS_Store
-.idea/
-.vscode/
-dist/
+*.py[cod]
+
+# Virtual environments
+venv/
+
+# PyInstaller build artifacts (only the build temp folder, not the final dist)
 build/
 *.spec
+
+# Logs and backups (user-generated)
+*.log
+*.zip
 MariaDB_Backups/
 RepairDiagnostics/
 RepairLogs.zip
+crash.log
+
+# IDE
+.vscode/
+.idea/

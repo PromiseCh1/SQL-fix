@@ -10,8 +10,12 @@ Created by **Promise**.
 
 ### Option 1: Download and Run the .exe (No Python Required)
 
-1. Go to the `dist` folder in this repository.
-2. Download `RepairSQL.exe`.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/RepairSQL.git
+   cd RepairSQL
+   ```
+2. Go to the `dist` folder in this repository.
 3. Right-click the `.exe` → **Run as administrator**.
 4. Click **Auto Detect** or browse to your XAMPP folder.
 5. Click **Smart Repair** – done.

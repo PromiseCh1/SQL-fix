@@ -1,85 +1,132 @@
-import os
 import shutil
 import subprocess
 import time
 from pathlib import Path
-from logger import Logger
+from typing import Optional, Callable
+
+from src.logger import Logger   # <-- absolute import
 
 class RepairEngine:
     def __init__(self, detector, backup_manager):
         self.detector = detector
         self.backup = backup_manager
         self.logger = Logger().get_logger()
-        self.data_path = detector.data_path
-        self.backup_mysql = os.path.join(detector.backup_path, "mysql")
+        self.data_path: Path = detector.data_path
+        self.backup_mysql: Path = detector.backup_path / "mysql"
 
-    def kill_mysqld(self):
-        """Force kill all mysqld.exe processes."""
+    def kill_mysqld(self) -> None:
         self.logger.info("Killing mysqld processes...")
-        subprocess.run(["taskkill", "/F", "/IM", "mysqld.exe"],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
+        subprocess.run(
+            ["taskkill", "/F", "/IM", "mysqld.exe"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=True
+        )
         time.sleep(1)
 
-    def verify_system_tables(self, mysql_path):
-        required = ["user.frm", "db.frm", "plugin.frm", "servers.frm"]
-        missing = []
-        for f in required:
-            if not os.path.exists(os.path.join(mysql_path, f)):
-                missing.append(f)
-        return missing
+    def verify_system_tables(self, mysql_path: Path) -> list[str]:
+        required = [
+            "user.frm", "db.frm", "plugin.frm", "servers.frm",
+            "global_priv.frm", "global_priv.MAD", "global_priv.MAI",
+            "columns_priv.frm", "columns_priv.MAD", "columns_priv.MAI",
+            "tables_priv.frm", "tables_priv.MAD", "tables_priv.MAI",
+            "proxies_priv.frm", "proxies_priv.MAD", "proxies_priv.MAI",
+            "roles_mapping.frm", "roles_mapping.MAD", "roles_mapping.MAI",
+            "innodb_table_stats.frm", "innodb_table_stats.ibd",
+            "innodb_index_stats.frm", "innodb_index_stats.ibd"
+        ]
+        return [f for f in required if not (mysql_path / f).exists()]
 
-    def smart_repair(self):
-        """Perform the safe repair procedure."""
+    def verify_mysqld_start(self, data_path: Path, mysqld_path: Path) -> tuple[bool, str]:
+        try:
+            proc = subprocess.Popen(
+                [str(mysqld_path), "--console"],
+                cwd=str(data_path),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                shell=True
+            )
+            time.sleep(5)
+            proc.terminate()
+            output, _ = proc.communicate(timeout=2)
+            if "Fatal error" in output or "Can't open" in output or "Incorrect file format" in output:
+                return False, output
+            if "ready for connections" in output:
+                return True, output
+            return True, output
+        except Exception as e:
+            return False, str(e)
+
+    def smart_repair(self, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Path:
         if not self.detector.xampp_path:
-            raise Exception("XAMPP not detected. Run detection first.")
+            raise RuntimeError("XAMPP not detected. Run detection first.")
 
-        # 1. Kill MySQL
+        if progress_callback:
+            progress_callback(1, 5, "Stopping MySQL...")
         self.kill_mysqld()
 
-        # 2. Backup the entire data folder
+        if progress_callback:
+            progress_callback(2, 10, "Creating full backup...")
         full_backup_dir = self.backup.create_full_backup(self.data_path)
         self.logger.info(f"Full backup saved to: {full_backup_dir}")
 
-        # 3. Replace system db
-        mysql_target = os.path.join(self.data_path, "mysql")
-        if os.path.exists(mysql_target):
-            # Backup current system db before overwriting
-            sys_backup = self.backup.backup_system_db(self.data_path)
-            self.logger.info(f"System database backed up to: {sys_backup}")
-            shutil.rmtree(mysql_target)
+        old_data_path = self.data_path.parent / (self.data_path.name + "_old")
+        if old_data_path.exists():
+            shutil.rmtree(old_data_path)
 
-        # Ensure backup mysql exists
-        if not os.path.exists(self.backup_mysql):
-            raise Exception("Backup mysql folder not found.")
+        if progress_callback:
+            progress_callback(3, 30, "Renaming current data...")
+        if self.data_path.exists():
+            self.data_path.rename(old_data_path)
 
+        if progress_callback:
+            progress_callback(4, 40, "Copying system database from backup...")
+        self.data_path.mkdir(parents=True, exist_ok=True)
+        mysql_target = self.data_path / "mysql"
         shutil.copytree(self.backup_mysql, mysql_target)
-        self.logger.info("System database replaced from backup.")
 
-        # 4. Verify system tables
+        if progress_callback:
+            progress_callback(5, 60, "Verifying system tables...")
         missing = self.verify_system_tables(mysql_target)
         if missing:
             self.logger.error(f"Verification failed. Missing: {missing}")
-            # Rollback: restore full backup
             shutil.rmtree(self.data_path)
-            shutil.copytree(full_backup_dir, self.data_path)
-            raise Exception("Repair failed – restored previous backup.")
-        self.logger.info("Verification passed.")
+            if old_data_path.exists():
+                old_data_path.rename(self.data_path)
+            raise RuntimeError(f"Repair failed – missing system tables: {', '.join(missing)}")
 
-        # 5. Ensure performance_schema and phpmyadmin exist (optional)
-        # XAMPP backup may not contain these; skip.
+        if progress_callback:
+            progress_callback(6, 70, "Verifying MariaDB start...")
+        success, output = self.verify_mysqld_start(self.data_path, self.detector.mysqld_path)
+        if not success:
+            self.logger.error("MariaDB verification start failed. Rolling back.")
+            shutil.rmtree(self.data_path)
+            if old_data_path.exists():
+                old_data_path.rename(self.data_path)
+            raise RuntimeError(f"Repair failed – MariaDB could not start. Output: {output[:200]}...")
 
-        # 6. Delete temporary files
-        for f in ["ibtmp1", "mysql.pid", "aria_log_control"]:
-            fp = os.path.join(self.data_path, f)
-            if os.path.exists(fp):
-                os.remove(fp)
+        if progress_callback:
+            progress_callback(7, 85, "Cleaning temporary files...")
+        temp_files = [
+            "ibtmp1", "mysql.pid", "aria_log_control",
+            "aria_log.00000001", "ib_logfile0", "ib_logfile1"
+        ]
+        for f in temp_files:
+            fp = self.data_path / f
+            if fp.exists():
+                fp.unlink()
                 self.logger.info(f"Removed {f}")
 
+        if old_data_path.exists():
+            shutil.rmtree(old_data_path)
+
         self.logger.info("Smart repair completed successfully.")
+        if progress_callback:
+            progress_callback(8, 100, "Repair successful!")
         return full_backup_dir
 
-    def attempt_start(self):
-        """Try to start MySQL via net start or manually."""
+    def attempt_start(self) -> None:
         try:
             subprocess.run(["net", "start", "mysql"], capture_output=True, shell=True)
         except:

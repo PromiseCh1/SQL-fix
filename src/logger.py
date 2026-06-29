@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 from datetime import datetime
 
 class Logger:
@@ -13,23 +13,23 @@ class Logger:
 
     def _init_logger(self):
         self.logger = logging.getLogger("RepairSQL")
-        self.logger.setLevel(logging.DEBUG)
+        if self.logger.handlers:
+            return
 
+        self.logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
             "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S"
         )
 
-        # Console handler
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+        console = logging.StreamHandler()
+        console.setLevel(logging.INFO)
+        console.setFormatter(formatter)
+        self.logger.addHandler(console)
 
-        # File handler
-        log_dir = os.path.join(os.path.expanduser("~"), "Documents", "RepairSQL_Logs")
-        os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, f"repair_{datetime.now().strftime('%Y%m%d')}.log")
+        log_dir = Path.home() / "Documents" / "RepairSQL_Logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / f"repair_{datetime.now().strftime('%Y%m%d')}.log"
         fh = logging.FileHandler(log_file, encoding="utf-8")
         fh.setLevel(logging.DEBUG)
         fh.setFormatter(formatter)
