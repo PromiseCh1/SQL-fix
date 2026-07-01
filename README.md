@@ -28,7 +28,7 @@ Created by **Promise**.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/RepairSQL.git
+   git clone https://github.com/Promisech1/RepairSQL.git
    cd RepairSQL
    ```
 
